@@ -8,7 +8,7 @@ import altair as alt
 
 
 # Import van311 service request data
-service_requests = pd.read_csv('/Users/ay/Desktop/Project2/data/311service-requests.csv')
+service_requests = pd.read_csv('/Users/ay/Desktop/Project2/service_requests_final.csv')
 
 # Display unique service request types
 service_requests['Service request type'].unique()
@@ -34,16 +34,10 @@ categories = {
 # Determine most frequent request types
 st.header("20 Most Frequent Request types")
 
-request_type_counts = service_requests['Service request type'].value_counts()
-most_frequent_requests = request_type_counts.head(20)
-st.table(most_frequent_requests)
-st.bar_chart(most_frequent_requests)
 
 
-# st.table(service_requests)
-st.bar_chart(service_requests['Category'].value_counts())
 
-import plotly.express as px
+
 
 df = service_requests
 
@@ -104,7 +98,6 @@ selection = alt.selection_single(
     bind=alt.binding_select(options=['Month', 'Weekday', 'Hour'], name="Time Period: "),
     value='Month'  # Set the initial value using the value argument
 )
-
 # Create the chart
 chart = alt.Chart(combined_data).mark_line(point=True).encode(
     x=alt.X('Value:O', title='Time'),
@@ -125,49 +118,68 @@ chart = alt.Chart(combined_data).mark_line(point=True).encode(
 st.altair_chart(chart, use_container_width=True)
 
 
-# Group data by category and request type
-monthly_data = (
-    service_requests.groupby(['month', 'Category', 'Service request type'])
+import pandas as pd
+import altair as alt
+import streamlit as st
+
+
+
+# Convert timestamps to datetime
+service_requests['Service request open timestamp'] = pd.to_datetime(
+    service_requests['Service request open timestamp'], errors='coerce'
+)
+
+# Add time-based columns
+service_requests['month'] = service_requests['Service request open timestamp'].dt.month
+service_requests['weekday'] = service_requests['Service request open timestamp'].dt.weekday
+service_requests['hour'] = service_requests['Service request open timestamp'].dt.hour
+
+# Aggregate counts for top 20 request types
+top_20_request_types = (
+    service_requests['Service request type']
+    .value_counts()
+    .head(20)
+    .index
+)
+
+filtered_data = service_requests[service_requests['Service request type'].isin(top_20_request_types)]
+
+# Prepare data for visualization
+category_trends = (
+    filtered_data.groupby(['Category', 'Service request type', 'month', 'weekday', 'hour'])
     .size()
     .reset_index(name='Count')
 )
 
-# Dropdown selection for category
-category_dropdown = alt.binding_select(
-    options=monthly_data['Category'].unique().tolist(),
-    name="Select Category: "
-)
+# Altair selection filters
 category_selection = alt.selection_single(
-    fields=['Category'],
-    bind=category_dropdown
+    fields=['Category'], 
+    bind=alt.binding_select(options=list(category_trends['Category'].unique()), name="Select Category: ")
 )
 
-# Dropdown selection for request type (dependent on category)
-request_type_dropdown = alt.binding_select(
-    options=monthly_data['Service request type'].unique().tolist(),
-    name="Select Request Type: "
+# Combine time metrics into a single column
+folded_data = category_trends.melt(
+    id_vars=['Category', 'Service request type', 'Count'],
+    value_vars=['month', 'weekday', 'hour'],
+    var_name='Time Metric',
+    value_name='Value'
 )
-request_type_selection = alt.selection_single(fields=['Service request type'], bind=request_type_dropdown)
 
-# Main chart (drills down by category and request type)
-chart = alt.Chart(monthly_data).mark_line(point=True).encode(
-    x=alt.X('month:O', title='Month'),
+# Define the chart
+time_chart = alt.Chart(folded_data).transform_filter(
+    category_selection
+).mark_line(point=True).encode(
+    x=alt.X('Value:O', title='Time Metric'),
     y=alt.Y('Count:Q', title='Number of Requests'),
     color='Service request type:N',
-    tooltip=['Service request type', 'Count', 'month']
-).add_selection(
-    category_selection
-).transform_filter(
-    category_selection
-).add_selection(
-    request_type_selection
-).transform_filter(
-    request_type_selection
+    tooltip=['Service request type', 'Time Metric', 'Value', 'Count']
 ).properties(
-    title="Trends by Category and Request Type",
+    title="Service Request Trends by Selected Time Metric",
     width=800,
     height=400
+).add_selection(
+    category_selection
 )
 
-# Display in Streamlit
-st.altair_chart(chart, use_container_width=True)
+# Streamlit to display the chart
+st.altair_chart(time_chart, use_container_width=True)
