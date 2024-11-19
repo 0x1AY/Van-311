@@ -8,7 +8,7 @@ import altair as alt
 
 
 # Import van311 service request data
-service_requests = pd.read_csv('/Users/ay/Desktop/Project2/service_requests_final.csv')
+service_requests = pd.read_csv('https://raw.githubusercontent.com/0x1AY/Van-311/refs/heads/main/data/service_requests_final.csv')
 
 # Display unique service request types
 service_requests['Service request type'].unique()
