@@ -118,68 +118,124 @@ chart = alt.Chart(combined_data).mark_line(point=True).encode(
 st.altair_chart(chart, use_container_width=True)
 
 
-import pandas as pd
-import altair as alt
-import streamlit as st
 
 
-
-# Convert timestamps to datetime
 service_requests['Service request open timestamp'] = pd.to_datetime(
     service_requests['Service request open timestamp'], errors='coerce'
 )
 
-# Add time-based columns
-service_requests['month'] = service_requests['Service request open timestamp'].dt.month
-service_requests['weekday'] = service_requests['Service request open timestamp'].dt.weekday
-service_requests['hour'] = service_requests['Service request open timestamp'].dt.hour
+# Extract time-based columns if not already present
+if 'month' not in service_requests.columns:
+    service_requests['month'] = service_requests['Service request open timestamp'].dt.month
+if 'weekday' not in service_requests.columns:
+    service_requests['weekday'] = service_requests['Service request open timestamp'].dt.weekday
+if 'hour' not in service_requests.columns:
+    service_requests['hour'] = service_requests['Service request open timestamp'].dt.hour
 
-# Aggregate counts for top 20 request types
-top_20_request_types = (
-    service_requests['Service request type']
-    .value_counts()
-    .head(20)
-    .index
-)
+# Title
+st.title("Service Request Dashboard")
 
-filtered_data = service_requests[service_requests['Service request type'].isin(top_20_request_types)]
+# Summary Statistics
+st.subheader("Summary of Service Requests")
 
-# Prepare data for visualization
-category_trends = (
-    filtered_data.groupby(['Category', 'Service request type', 'month', 'weekday', 'hour'])
+total_requests = len(service_requests)
+categories_count = service_requests["Category"].nunique()
+neighborhoods_count = service_requests["Local area"].nunique()
+most_common_category = service_requests["Category"].value_counts().idxmax()
+most_common_neighborhood = service_requests["Local area"].value_counts().idxmax()
+
+# Display summary statistics
+st.metric("Total Requests", total_requests)
+st.metric("Total Categories", categories_count)
+st.metric("Total Neighborhoods", neighborhoods_count)
+st.metric("Most Common Category", most_common_category)
+st.metric("Most Common Neighborhood", most_common_neighborhood)
+
+# Add a separator
+st.markdown("---")
+
+# Filter Section
+st.subheader("Filter Service Requests")
+selected_category = st.selectbox("Select a Category", ["All"] + list(service_requests["Category"].unique()))
+selected_neighborhood = st.selectbox("Select a Neighborhood", ["All"] + list(service_requests["Local area"].unique()))
+
+# Apply filters
+filtered_data = service_requests.copy()
+if selected_category != "All":
+    filtered_data = filtered_data[filtered_data["Category"] == selected_category]
+if selected_neighborhood != "All":
+    filtered_data = filtered_data[filtered_data["Local area"] == selected_neighborhood]
+
+# Neighborhood Summary
+neighborhood_summary = (
+    filtered_data.groupby(["Local area", "Latitude", "Longitude"])
     .size()
-    .reset_index(name='Count')
+    .reset_index(name="Request Volume")
 )
 
-# Altair selection filters
-category_selection = alt.selection_single(
-    fields=['Category'], 
-    bind=alt.binding_select(options=list(category_trends['Category'].unique()), name="Select Category: ")
+# Weekday Trends
+weekday_trends = (
+    filtered_data.groupby("weekday")
+    .size()
+    .reset_index(name="Request Volume")
 )
 
-# Combine time metrics into a single column
-folded_data = category_trends.melt(
-    id_vars=['Category', 'Service request type', 'Count'],
-    value_vars=['month', 'weekday', 'hour'],
-    var_name='Time Metric',
-    value_name='Value'
+# Time of Day Trends
+hourly_trends = (
+    filtered_data.groupby("hour")
+    .size()
+    .reset_index(name="Request Volume")
 )
 
-# Define the chart
-time_chart = alt.Chart(folded_data).transform_filter(
-    category_selection
-).mark_line(point=True).encode(
-    x=alt.X('Value:O', title='Time Metric'),
-    y=alt.Y('Count:Q', title='Number of Requests'),
-    color='Service request type:N',
-    tooltip=['Service request type', 'Time Metric', 'Value', 'Count']
-).properties(
-    title="Service Request Trends by Selected Time Metric",
-    width=800,
-    height=400
-).add_selection(
-    category_selection
-)
+# Map Visualization
+st.subheader("Request Volume by Neighborhood")
+if not neighborhood_summary.empty:
+    fig_map = px.scatter_mapbox(
+        neighborhood_summary,
+        lat="Latitude",
+        lon="Longitude",
+        size="Request Volume",
+        color="Request Volume",
+        hover_name="Local area",
+        hover_data={"Latitude": False, "Longitude": False, "Request Volume": True},
+        title="Request Volume by Neighborhood",
+        color_continuous_scale="Viridis",
+        zoom=11,
+        height=600,
+    )
+    fig_map.update_layout(mapbox_style="carto-positron")
+    st.plotly_chart(fig_map, use_container_width=True)
+else:
+    st.write("No data available for the selected filters.")
 
-# Streamlit to display the chart
-st.altair_chart(time_chart, use_container_width=True)
+# Weekday Trend Visualization
+st.subheader("Request Volume by Weekday")
+if not weekday_trends.empty:
+    fig_weekday = px.bar(
+        weekday_trends,
+        x="weekday",
+        y="Request Volume",
+        title="Requests by Weekday",
+        labels={"weekday": "Weekday (0=Monday, 6=Sunday)", "Request Volume": "Number of Requests"},
+        text="Request Volume",
+    )
+    fig_weekday.update_layout(xaxis_title="Weekday", yaxis_title="Request Volume")
+    st.plotly_chart(fig_weekday, use_container_width=True)
+else:
+    st.write("No data available for the selected filters.")
+
+# Time of Day Trend Visualization
+st.subheader("Request Volume by Time of Day")
+if not hourly_trends.empty:
+    fig_hourly = px.bar(
+        hourly_trends,
+        x="hour",
+        y="Request Volume",
+        title="Requests by Hour of Day",
+        labels={"hour": "Hour of Day", "Request Volume": "Number of Requests"},
+        text="Request Volume",
+    )
+    fig_hourly.update_layout(xaxis_title="Hour of Day", yaxis_title="Request Volume")
+    st.plotly_chart(fig_hourly, use_container_width=True)
+else:
+    st.write("No data available for the selected filters.")
