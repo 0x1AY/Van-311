@@ -502,3 +502,79 @@ st.write(
 )
 
 
+# contact center metric analysis
+
+contact_center_metrics = pd.read_csv("https://raw.githubusercontent.com/0x1AY/Van-311/refs/heads/main/data/3-1-1-contact-centre-metrics.csv", delimiter=";")
+
+
+
+# Convert "Date" to datetime
+contact_center_metrics["Date"] = pd.to_datetime(contact_center_metrics["Date"])
+
+# Calculate percentage of calls handled vs. abandoned
+contact_center_metrics["Handled Percentage"] = (
+    contact_center_metrics["CallsHandled"] / contact_center_metrics["CallsOffered"]
+) * 100
+contact_center_metrics["Abandoned Percentage"] = (
+    contact_center_metrics["CallsAbandoned"] / contact_center_metrics["CallsOffered"]
+) * 100
+
+# Aggregate metrics by month
+contact_center_metrics["Year-Month"] = contact_center_metrics["Date"].dt.to_period("M").astype(str)  # Convert to string
+monthly_metrics = contact_center_metrics.groupby("Year-Month").agg(
+    {"CallsOffered": "sum", "CallsHandled": "sum", "CallsAbandoned": "sum",
+     "AverageSpeedofAnswer": "mean", "ServiceLevel": "mean"}
+).reset_index()
+
+# Recalculate monthly percentages
+monthly_metrics["Handled Percentage"] = (
+    monthly_metrics["CallsHandled"] / monthly_metrics["CallsOffered"]
+) * 100
+monthly_metrics["Abandoned Percentage"] = (
+    monthly_metrics["CallsAbandoned"] / monthly_metrics["CallsOffered"]
+) * 100
+
+# Streamlit Dashboard
+st.title("311 Contact Centre Metrics Analysis")
+
+# Call Handling Metrics
+st.subheader("Call Handling Metrics: Handled vs. Abandoned")
+fig_handled_abandoned = px.bar(
+    monthly_metrics,
+    x="Year-Month",
+    y=["Handled Percentage", "Abandoned Percentage"],
+    barmode="stack",
+    title="Percentage of Calls Handled vs. Abandoned Over Time",
+    labels={"value": "Percentage", "Year-Month": "Year-Month", "variable": "Metric"},
+)
+st.plotly_chart(fig_handled_abandoned, use_container_width=True)
+
+# Average Response Times Over Time
+st.subheader("Average Response Times Over Time")
+fig_response_times = px.line(
+    monthly_metrics,
+    x="Year-Month",
+    y="AverageSpeedofAnswer",
+    title="Average Response Times Over Time",
+    labels={"Year-Month": "Year-Month", "AverageSpeedofAnswer": "Average Speed of Answer (seconds)"},
+    markers=True,
+)
+st.plotly_chart(fig_response_times, use_container_width=True)
+
+# Performance Correlations
+st.subheader("Performance Correlations")
+correlation_metrics = contact_center_metrics[["CallsHandled", "AverageSpeedofAnswer", "ServiceLevel"]].corr()
+
+st.write("**Correlation Matrix:**")
+st.dataframe(correlation_metrics)
+
+# Recommendations
+st.subheader("Recommendations for Operational Efficiency")
+st.write(
+    """
+    **Based on findings:**
+    - Optimize workforce allocation during months with higher abandonment rates and response times.
+    - Reduce average response times during peak call volumes to minimize customer frustration.
+    - Monitor and improve service level to maintain call resolution quality.
+    """
+)
