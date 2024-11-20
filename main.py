@@ -10,6 +10,7 @@ import altair as alt
 # Import van311 service request data
 service_requests = pd.read_csv('https://raw.githubusercontent.com/0x1AY/Van-311/refs/heads/main/data/service_requests_final.csv')
 
+
 # Display unique service request types
 service_requests['Service request type'].unique()
 
@@ -418,3 +419,84 @@ st.plotly_chart(fig_month, use_container_width=True)
 
 
 #  311 Inquiry Volume Dataset Analysis
+
+#import inquiry volume data set
+inquiry_volume = pd.read_csv("https://raw.githubusercontent.com/0x1AY/Van-311/refs/heads/main/data/3-1-1-inquiry-volume.csv", delimiter=";")
+
+# Convert "Year Month" to datetime
+inquiry_volume["Year Month"] = pd.to_datetime(inquiry_volume["Year Month"], format="%Y-%m")
+
+# Inquiry Volume Trends
+st.title("311 Inquiry Volume Dataset Analysis")
+st.subheader("Inquiry Volume Trends")
+
+# Aggregate volume by time
+volume_trends = (
+    inquiry_volume.groupby("Year Month")["Number of Records"]
+    .sum()
+    .reset_index()
+)
+
+# Line Chart: Volume Over Time
+fig_trends = px.line(
+    volume_trends,
+    x="Year Month",
+    y="Number of Records",
+    title="Inquiry Volume Over Time",
+    labels={"Year Month": "Year-Month", "Number of Records": "Number of Inquiries"},
+    markers=True,
+)
+st.plotly_chart(fig_trends, use_container_width=True)
+
+# Workforce Allocation Suggestion
+st.subheader("Workforce Allocation Suggestions")
+peak_month = volume_trends.loc[volume_trends["Number of Records"].idxmax()]
+low_month = volume_trends.loc[volume_trends["Number of Records"].idxmin()]
+st.write(f"**Peak Demand Month:** {peak_month['Year Month'].strftime('%B %Y')} with {peak_month['Number of Records']} inquiries.")
+st.write(f"**Low Demand Month:** {low_month['Year Month'].strftime('%B %Y')} with {low_month['Number of Records']} inquiries.")
+st.write(
+    """
+    **Workforce Allocation Strategies:**
+    - Increase workforce during peak months to handle higher demand.
+    - Reduce workforce or reallocate to other tasks during low-demand months.
+    - Monitor historical trends for long-term planning.
+    """
+)
+
+# Impact of Web/Chat Options
+st.subheader("Impact of Alternative Channels (Web/Chat)")
+
+# Filter for web and chat channels
+channel_trends = (
+    inquiry_volume.groupby(["Year Month", "Channel"])["Number of Records"]
+    .sum()
+    .reset_index()
+)
+
+# Line Chart: Channel Popularity Over Time
+fig_channels = px.line(
+    channel_trends,
+    x="Year Month",
+    y="Number of Records",
+    color="Channel",
+    title="Inquiry Volume by Channel Over Time",
+    labels={"Year Month": "Year-Month", "Number of Records": "Number of Inquiries", "Channel": "Channel"},
+    markers=True,
+)
+st.plotly_chart(fig_channels, use_container_width=True)
+
+# Popularity of Web/Chat Options
+st.subheader("Channel Popularity Insights")
+web_chat_trends = channel_trends[channel_trends["Channel"].isin(["Web", "Chat"])]
+web_chat_total = web_chat_trends["Number of Records"].sum()
+total_inquiries = inquiry_volume["Number of Records"].sum()
+
+web_chat_percentage = (web_chat_total / total_inquiries) * 100
+st.write(f"**Web/Chat Usage:** {web_chat_percentage:.2f}% of all inquiries.")
+st.write(
+    """
+    **Observations:**
+    - Track the growth of web and chat channels over time to assess digital adoption.
+    - Consider shifting resources to support popular channels during peak times.
+    """
+)
