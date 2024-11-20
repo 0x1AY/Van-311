@@ -239,3 +239,182 @@ if not hourly_trends.empty:
     st.plotly_chart(fig_hourly, use_container_width=True)
 else:
     st.write("No data available for the selected filters.")
+
+
+# 	Closure and Fulfillment Analysis:
+
+
+# more analysis
+
+# Calculate closure summary
+closure_summary = (
+    service_requests.groupby("Category_cr")
+    .size()
+    .reset_index(name="Count")
+)
+
+# Calculate percentages
+closure_summary["Percentage"] = (closure_summary["Count"] / closure_summary["Count"].sum()) * 100
+
+# Display summary table
+st.title("Closure and Fulfillment Analysis")
+# st.subheader("Summary of Closure Categories")
+# st.dataframe(closure_summary)
+
+# Visualize closure categories distribution (Bar Chart)
+# st.subheader("Distribution of Closure Categories")
+# fig_bar = px.bar(
+#     closure_summary,
+#     x="Category_cr",
+#     y="Count",
+#     text="Percentage",
+#     title="Closure Categories Distribution",
+#     labels={"Category_cr": "Closure Category", "Count": "Number of Requests"},
+#     color="Category_cr",
+# )
+# fig_bar.update_traces(texttemplate="%{text:.2f}%", textposition="outside")
+# st.plotly_chart(fig_bar, use_container_width=True)
+
+# Visualize closure categories breakdown (Pie Chart)
+st.subheader("Closure Categories Breakdown")
+fig_pie = px.pie(
+    closure_summary,
+    names="Category_cr",
+    values="Count",
+    # title="Closure Categories Breakdown",
+    color="Category_cr",
+    hole=0.4,
+)
+st.plotly_chart(fig_pie, use_container_width=True)
+
+# Filters for Category and Local Area
+st.subheader("Explore Closure Patterns by Filters")
+selected_category = st.selectbox("Filter by Service Request Category", ["All"] + list(service_requests["Category"].unique()))
+selected_local_area = st.selectbox("Filter by Local Area", ["All"] + list(service_requests["Local area"].unique()))
+
+# Apply filters
+filtered_data = service_requests.copy()
+if selected_category != "All":
+    filtered_data = filtered_data[filtered_data["Category"] == selected_category]
+if selected_local_area != "All":
+    filtered_data = filtered_data[filtered_data["Local area"] == selected_local_area]
+
+# Recalculate closure summary based on filters
+filtered_closure_summary = (
+    filtered_data.groupby("Category_cr")
+    .size()
+    .reset_index(name="Count")
+)
+filtered_closure_summary["Percentage"] = (filtered_closure_summary["Count"] / filtered_closure_summary["Count"].sum()) * 100
+
+# Display filtered summary table
+st.subheader("Filtered Closure Summary")
+st.dataframe(filtered_closure_summary)
+
+# Trends Over Time
+st.subheader("Closure Trends Over Time")
+trend_data = (
+    filtered_data.groupby(["month", "Category_cr"])
+    .size()
+    .reset_index(name="Count")
+)
+
+fig_trends = px.line(
+    trend_data,
+    x="month",
+    y="Count",
+    color="Category_cr",
+    title="Closure Categories Over Time",
+    labels={"month": "Month", "Count": "Number of Requests", "Category_cr": "Closure Category"},
+)
+st.plotly_chart(fig_trends, use_container_width=True)
+
+
+
+# Convert timestamps to datetime and remove timezone info
+service_requests['Service request open timestamp'] = pd.to_datetime(
+    service_requests['Service request open timestamp'], errors='coerce'
+).dt.tz_localize(None)
+
+service_requests['Service request close date'] = pd.to_datetime(
+    service_requests['Service request close date'], errors='coerce'
+).dt.tz_localize(None)
+
+# Calculate completion time (in days)
+service_requests['Completion Time (days)'] = (
+    service_requests['Service request close date'] - service_requests['Service request open timestamp']
+).dt.total_seconds() / (24 * 3600)  # Convert seconds to days
+
+# Filter out requests without completion dates or negative durations
+service_requests = service_requests[service_requests['Completion Time (days)'] >= 0]
+
+# Completion Time by Request Type
+completion_by_type = (
+    service_requests.groupby('Category')['Completion Time (days)']
+    .mean()
+    .reset_index()
+    .rename(columns={'Completion Time (days)': 'Avg Completion Time (days)'})
+)
+
+# Completion Time by Neighborhood
+completion_by_neighborhood = (
+    service_requests.groupby('Local area')['Completion Time (days)']
+    .mean()
+    .reset_index()
+    .rename(columns={'Completion Time (days)': 'Avg Completion Time (days)'})
+)
+
+# Completion Time by Month
+service_requests['month'] = service_requests['Service request open timestamp'].dt.month
+completion_by_month = (
+    service_requests.groupby('month')['Completion Time (days)']
+    .mean()
+    .reset_index()
+    .rename(columns={'Completion Time (days)': 'Avg Completion Time (days)'})
+)
+
+# Streamlit Dashboard
+st.title("Request Completion Time Analysis")
+
+# Display Completion Time by Request Type
+st.subheader("Average Completion Time by Request Category")
+fig_type = px.bar(
+    completion_by_type,
+    x="Category",
+    y="Avg Completion Time (days)",
+    # title="Average Completion Time by Request Category",
+    labels={"Service request type": "Request Type", "Avg Completion Time (days)": "Average Completion Time (days)"},
+    text="Avg Completion Time (days)"
+)
+fig_type.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+fig_type.update_layout(xaxis_tickangle=45)
+st.plotly_chart(fig_type, use_container_width=True)
+
+# Display Completion Time by Neighborhood
+st.subheader("Average Completion Time by Neighborhood")
+fig_neighborhood = px.bar(
+    completion_by_neighborhood,
+    x="Local area",
+    y="Avg Completion Time (days)",
+    # title="Average Completion Time by Neighborhood",
+    labels={"Local area": "Neighborhood", "Avg Completion Time (days)": "Average Completion Time (days)"},
+    text="Avg Completion Time (days)"
+)
+fig_neighborhood.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+fig_neighborhood.update_layout(xaxis_tickangle=45)
+st.plotly_chart(fig_neighborhood, use_container_width=True)
+
+# Display Completion Time by Month
+st.subheader("Average Completion Time by Month")
+fig_month = px.line(
+    completion_by_month,
+    x="month",
+    y="Avg Completion Time (days)",
+    # title="Average Completion Time by Month",
+    labels={"month": "Month", "Avg Completion Time (days)": "Average Completion Time (days)"},
+    markers=True
+)
+st.plotly_chart(fig_month, use_container_width=True)
+
+
+#  311 Inquiry Volume Dataset Analysis
