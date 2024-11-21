@@ -11,14 +11,14 @@ The Van 311 Analytics project aims to analyze the 311 service data for Vancouver
 - .gitignore
 - app.py
 - data/
- - 3-1-1-contact-centre-metrics.csv
- - 3-1-1-inquiry-volume.csv
- - 3-1-1-service-requests-2009-2021.csv
- - 3-1-1-service-requests.csv
- - 311service-requests.csv
- - Closure_Reason_Categorization.csv
- - service_requests_final.csv
- - Vancouver_Neighborhood_Geocodes.csv
+ -- 3-1-1-contact-centre-metrics.csv
+ -- 3-1-1-inquiry-volume.csv
+ -- 3-1-1-service-requests-2009-2021.csv
+ -- 3-1-1-service-requests.csv
+ -- 311service-requests.csv
+ -- Closure_Reason_Categorization.csv
+ -- service_requests_final.csv
+ -- Vancouver_Neighborhood_Geocodes.csv
 - main.ipynb
 - README.md
 - requirements.txt
