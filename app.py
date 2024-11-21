@@ -14,7 +14,7 @@ service_requests = pd.read_csv('https://raw.githubusercontent.com/0x1AY/Van-311/
 # Display unique service request types
 service_requests['Service request type'].unique()
 
-st.title('Project 2')
+st.title('Van 311 Analytics')
 # st.header('Improving Vancouver’s 311 Service Efficiency Using Data Analytics')
 # # st.subheader('By Aminu Yiwere')
 
